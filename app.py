@@ -4,11 +4,94 @@ import streamlit.components.v1 as components
 import json
 import pandas as pd
 import sqlite3
+from core.fhir_to_omop import fhir_to_omop_sql, client
+from core.qa_copilot import run_quality_checks
+from utils.db_utils import get_db_engine
+from utils.fhir_utils import extract_patient_id
+from core.etl import run_etl, run_analytics
+import os
+from utils.config_utils import load_config
+
+# Sidebar DB config using config.yaml defaults
+config = load_config()
+st.sidebar.header("Database Backend")
+default_backend = config['database']['backend']
+db_type = st.sidebar.selectbox("Select database backend", ["sqlite", "postgresql"], index=0 if default_backend=="sqlite" else 1)
+if db_type == "sqlite":
+    default_sqlite = config['database']['sqlite_path']
+    db_path = st.sidebar.text_input("SQLite DB Path", value=default_sqlite)
+    pg_settings = None
+else:
+    pg_conf = config['database']['postgresql']
+    db_path = None
+    pg_settings = {
+        'user': st.sidebar.text_input("PostgreSQL User", value=pg_conf.get('user', 'clinical_user')),
+        'password': st.sidebar.text_input("PostgreSQL Password", type="password", value=pg_conf.get('password', 'StrongPassword123')),
+        'host': st.sidebar.text_input("PostgreSQL Host", value=pg_conf.get('host', 'localhost')),
+        'port': st.sidebar.text_input("PostgreSQL Port", value=str(pg_conf.get('port', '5432'))),
+        'db': st.sidebar.text_input("PostgreSQL DB Name", value=pg_conf.get('db', 'clinical_demo')),
+    }
+
+import streamlit as st
+import streamlit.components.v1 as components
+import json
+import pandas as pd
+import sqlite3
 import requests
 from core.fhir_to_omop import fhir_to_omop_sql, client
 from core.qa_copilot import run_quality_checks
 from utils.db_utils import connect_omop_db
 from utils.fhir_utils import extract_patient_id
+from core.etl import run_etl, run_analytics
+st.markdown("---")
+st.header("ETL & Analytics Jobs")
+st.write("Run OMOP ETL and analytics directly from the app. Uses sample data and your selected backend (default: SQLite).")
+
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("Run ETL (Load Sample Data)"):
+        with st.spinner("Running ETL job..."):
+            try:
+                run_etl(db_type=db_type, db_path=db_path, pg_settings=pg_settings)
+                st.success("ETL complete: data loaded to OMOP tables.")
+            except Exception as e:
+                st.error(f"ETL failed: {e}")
+with col2:
+    if st.button("Run Analytics (Generate Charts)"):
+        with st.spinner("Running analytics job..."):
+            try:
+                run_analytics(db_type=db_type, db_path=db_path, pg_settings=pg_settings)
+                st.success("Analytics complete: charts saved to docs/.")
+                st.subheader("Analytics Results (Charts)")
+                chart_dir = os.path.join(os.path.dirname(__file__), "docs")
+                chart_files = [
+                    ("Persons by Gender", "persons_by_gender.png"),
+                    ("Age Distribution", "age_distribution.png"),
+                    ("Observations per Year", "observations_per_year.png")
+                ]
+                for title, fname in chart_files:
+                    fpath = os.path.join(chart_dir, fname)
+                    if os.path.exists(fpath):
+                        st.markdown(f"**{title}:**")
+                        st.image(fpath)
+                    else:
+                        st.info(f"Chart not found: {fname}")
+            except Exception as e:
+                st.error(f"Analytics failed: {e}")
+# Always show OMOP data preview after ETL/analytics, regardless of which button was clicked
+engine = get_db_engine(db_type=db_type, db_path=db_path, pg_settings=pg_settings)
+st.subheader("Preview: person table")
+try:
+    df_person = pd.read_sql("SELECT * FROM person LIMIT 10", engine)
+    st.dataframe(df_person)
+except Exception as e:
+    st.info(f"Could not load person table: {e}")
+st.subheader("Preview: observation table")
+try:
+    df_obs = pd.read_sql("SELECT * FROM observation LIMIT 10", engine)
+    st.dataframe(df_obs)
+except Exception as e:
+    st.info(f"Could not load observation table: {e}")
 
 
 # --- LLM Q&A Chat Box ---
@@ -106,7 +189,7 @@ elif oncology_source == "cBioPortal":
         st.write(df_cbio.head())
     elif st.button("Load cBioPortal Study from API"):
         try:
-            import requests
+            # import requests  # Removed unnecessary import
             import pandas as pd
             api_url = f"https://www.cbioportal.org/api/studies/{study_id}/clinical-data"
             resp = requests.get(api_url)
@@ -132,7 +215,7 @@ elif oncology_source == "cBioPortal":
 
     if st.button("List Available Data Types (Molecular Profiles)"):
         try:
-            import requests
+            # import requests  # Removed unnecessary import
             profiles_url = f"https://www.cbioportal.org/api/studies/{study_id}/molecular-profiles"
             resp = requests.get(profiles_url)
             resp.raise_for_status()
@@ -160,7 +243,7 @@ elif oncology_source == "cBioPortal":
         st.session_state['cbioportal_selected_profile'] = selected_profile
         if st.button("Fetch Data for Selected Profile"):
             try:
-                import requests
+                # import requests  # Removed unnecessary import
                 # Find the selected profile's alteration type
                 profiles_full = st.session_state.get('cbioportal_profiles_full', [])
                 profile_info = next((p for p in profiles_full if p['molecularProfileId'] == selected_profile), None)
