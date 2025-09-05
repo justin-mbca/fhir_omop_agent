@@ -80,24 +80,34 @@ This project implements a modern clinical data engineering workflow, integrating
 ```mermaid
 flowchart TD
    %% User Interaction
-   U1([User: Streamlit GUI])
+   subgraph USER[User Interface]
+      U1([User: Streamlit GUI])
+   end
 
    %% Data Sources
-   FHIR1([FHIR Server])
-   ONCOKB([OncoKB API/CSV])
-   COSMIC([COSMIC TSV/CSV/URL])
-   CBIO([cBioPortal API/CSV])
+   subgraph SOURCES[Data Sources]
+      FHIR1([FHIR Server])
+      ONCOKB([OncoKB API/CSV])
+      COSMIC([COSMIC TSV/CSV/URL])
+      CBIO([cBioPortal API/CSV])
+   end
 
    %% LLM/AI
-   LLM1([LLM: Llama 2 / Mistral / TinyLlama])
-   LLM2([LLM: Mapping / QA / Chat])
+   subgraph AI[LLM / AI]
+      LLM1([LLM: Llama 2 / Mistral / TinyLlama])
+      LLM2([LLM: Mapping / QA / Chat])
+   end
 
    %% OMOP/DB
-   OMOP1([OMOP SQLite/PostgreSQL DB])
-   QA([QA Copilot: ydata-profiling])
+   subgraph OMOP[OMOP & QA]
+      OMOP1([OMOP SQLite/PostgreSQL DB])
+      QA([QA Copilot: ydata-profiling])
+   end
 
    %% Analytics
-   ANALYTICS([Analytics & Visualization<br>Python, SQL, Power BI, Tableau])
+   subgraph ANALYTICS[Analytics & Visualization]
+      ANALYTICS1([Python, SQL, Power BI, Tableau])
+   end
 
    %% Data Flow
    U1 -- "Fetch FHIR" --> FHIR1
@@ -118,13 +128,13 @@ flowchart TD
    OMOP1 -- "Table Data" --> QA
    QA -- "QA Report" --> U1
 
-   OMOP1 -- "Data for Analytics" --> ANALYTICS
-   ANALYTICS -- "Insights, Reports" --> U1
+   OMOP1 -- "Data for Analytics" --> ANALYTICS1
+   ANALYTICS1 -- "Insights, Reports" --> U1
 
    %% Layout hints for more spread
    FHIR1 --- ONCOKB --- COSMIC --- CBIO
    LLM1 --- LLM2
-   OMOP1 --- QA --- ANALYTICS
+   OMOP1 --- QA --- ANALYTICS1
 ```
 
 ---
@@ -146,29 +156,8 @@ flowchart TD
 
 ## Project Structure
 
-```
-fhir_omop_agent/
-├── app.py                  # Main Streamlit app
-├── core/                   # Core logic: mapping, QA, FHIR/OMOP sample generation
-│   ├── fhir_to_omop.py
-│   ├── qa_copilot.py
-│   ├── fetch_fhir_samples.py
-│   └── generate_omop_samples.py
-├── utils/                  # Utility functions (db_utils.py, fhir_utils.py)
-├── integration/            # Future integrations (oncology, on_premise)
-│   ├── oncology/
-│   └── on_premise/
-├── data/                   # Sample FHIR/OMOP data, external data
-│   ├── sample_fhir/
-│   ├── sample_omop/
-│   └── external/
-├── mermaid_diagram.md      # System architecture diagram
-└── README.md
-```
 
-## Setup
-1. **Install dependencies:**
-   ```bash
+<!-- The Data Workflow Diagram is now combined above for clarity and consistency. -->
    pip install -r requirements.txt
    # Or manually: streamlit pandas ydata-profiling requests ollama
    ```
