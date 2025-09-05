@@ -1,0 +1,4 @@
+patientId,age,gender,mutation,diagnosis
+P001,65,Female,TP53_R248Q,Lung Adenocarcinoma
+P002,58,Female,EGFR_L858R,Lung Adenocarcinoma
+P003,72,Male,TP53_R273H,Breast Carcinoma

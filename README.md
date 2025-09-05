@@ -6,13 +6,17 @@ This app demonstrates a local, LLM-powered pipeline for mapping FHIR resources t
 ## Features
 
 - Modular codebase for easy extension and maintenance
+- LLM Chat: ask any question to the LLM (choose model for speed/quality)
+- LLM Mapping Prompt Playground: experiment with custom prompts and any data (e.g., CSV columns, FHIR JSON) for OMOP mapping suggestions
+- Oncology Data Loader Demos:
+   - OncoKB: Load via API (institutional email required) or upload CSV
+   - COSMIC: Upload TSV/CSV or load from public URL
+   - cBioPortal: Load clinical/molecular data via API (study ID) or upload CSV; list and fetch available molecular profiles (mutation, copy number, mRNA, etc.)
 - Fetch FHIR resources (Patient, Condition, Encounter, and more) from the public HAPI FHIR server
 - Review FHIR resources in table format
 - Map FHIR resources to OMOP tables (person, condition_occurrence, visit_occurrence) using robust Python logic with LLM fallback
 - Run QA profiling on OMOP tables (ydata-profiling)
 - Generate OMOP SQL from FHIR JSON using LLM (Llama 2, Mistral, TinyLlama via Ollama)
-- LLM Prompt Playground: experiment with custom prompts and FHIR JSON
-- LLM Chat: ask any question to the LLM (choose model for speed/quality)
 
 ## Project Structure
 
@@ -61,19 +65,26 @@ fhir_omop_agent/
 - Integrate external or on-premise data sources in `integration/`
 - Place sample or external data in `data/`
 
+
 ## Usage
+
+- **LLM Chat:** Ask any question to the LLM (choose model for speed/quality).
+- **LLM Mapping Prompt Playground:** Enter a custom prompt and sample data (e.g., CSV columns, FHIR JSON) to get OMOP mapping suggestions from the LLM.
+- **Oncology Data Loader Demos:**
+   - **OncoKB:** Enter API token and gene, or upload a CSV file. Preview and analyze variant data.
+   - **COSMIC:** Upload a COSMIC TSV/CSV file or enter a public URL. Preview and analyze mutation data.
+   - **cBioPortal:** Enter a study ID to fetch clinical/molecular data via API, or upload a CSV. List and fetch available molecular profiles (mutation, copy number, mRNA, etc.).
 - **FHIR Resource Viewer:** Fetch and review FHIR resources from the HAPI FHIR server. Select resource type and number of rows.
 - **Map to OMOP:** After fetching Patient, Condition, or Encounter, click "Map to OMOP" to populate the OMOP SQLite database (`omop_demo.db`).
 - **Run QA:** Select an OMOP table and run data profiling (QA) with ydata-profiling.
-- **LLM Mapping Prompt Playground:** Enter a custom prompt, FHIR JSON, and OMOP table to see LLM-generated SQL or mapping.
-- **LLM Chat:** Ask any question to the LLM. Choose a smaller model for faster responses.
 
 ## Notes
 
-- Modular structure supports future growth and integration with external data sources (e.g., oncology DB, on-premise OMOP).
+- Modular structure supports future growth and integration with external data sources (e.g., oncology DB, on-premise OMOP, cBioPortal, COSMIC, OncoKB).
 - The OMOP database is `omop_demo.db` in your project directory. It is dynamic and updated by the app.
 - The app uses robust hard-coded mapping for speed, with LLM fallback for flexibility.
 - You can add more OMOP tables and FHIR resource mappings as needed.
+- LLM features (chat, mapping playground) are available at the top of the app for rapid prototyping and mapping suggestions.
 
 ## Requirements
 - Python 3.11+

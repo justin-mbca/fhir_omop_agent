@@ -1,0 +1,4 @@
+Hugo_Symbol,Alteration,Consequence,Oncogenic,MutationEffect,CancerType,Level,PMIDs
+TP53,R248Q,Missense,Oncogenic,Gain-of-function,Lung Adenocarcinoma,1,12345678
+TP53,R273H,Missense,Oncogenic,Gain-of-function,Breast Carcinoma,2,23456789
+EGFR,L858R,Missense,Oncogenic,Gain-of-function,Lung Adenocarcinoma,1,34567890

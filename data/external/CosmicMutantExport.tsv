@@ -1,0 +1,4 @@
+Gene name	Accession Number	Mutation ID	Mutation CDS	Mutation AA	Mutation Description	Primary site	Site subtype 1	Histology	Histology subtype 1
+TP53	ENST00000269305	COSM476	c.743G>A	p.R248Q	Missense	lung	lung	carcinoma	adenocarcinoma
+TP53	ENST00000269305	COSM477	c.818G>A	p.R273H	Missense	breast	breast	carcinoma	ductal carcinoma
+EGFR	ENST00000275493	COSM6240	c.2573T>G	p.L858R	Missense	lung	lung	carcinoma	adenocarcinoma
