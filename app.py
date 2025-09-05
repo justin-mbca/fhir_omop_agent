@@ -64,18 +64,19 @@ with col2:
                 st.success("Analytics complete: charts saved to docs/.")
                 st.subheader("Analytics Results (Charts)")
                 chart_dir = os.path.join(os.path.dirname(__file__), "docs")
-                chart_files = [
-                    ("Persons by Gender", "persons_by_gender.png"),
-                    ("Age Distribution", "age_distribution.png"),
-                    ("Observations per Year", "observations_per_year.png")
-                ]
-                for title, fname in chart_files:
-                    fpath = os.path.join(chart_dir, fname)
-                    if os.path.exists(fpath):
-                        st.markdown(f"**{title}:**")
-                        st.image(fpath)
-                    else:
-                        st.info(f"Chart not found: {fname}")
+                # Dynamically find all PNG diagrams in docs/
+                chart_files = [f for f in os.listdir(chart_dir) if f.endswith(".png")]
+                if chart_files:
+                    cols = st.columns(2)
+                    for idx, fname in enumerate(sorted(chart_files)):
+                        fpath = os.path.join(chart_dir, fname)
+                        # Use filename as title, prettified
+                        title = os.path.splitext(fname)[0].replace("_", " ").title()
+                        with cols[idx % 2]:
+                            st.markdown(f"**{title}:**")
+                            st.image(fpath)
+                else:
+                    st.info("No analytics diagrams found in docs/ directory.")
             except Exception as e:
                 st.error(f"Analytics failed: {e}")
 # Always show OMOP data preview after ETL/analytics, regardless of which button was clicked
