@@ -87,12 +87,23 @@ fhir_omop_agent/
 - LLM features (chat, mapping playground) are available at the top of the app for rapid prototyping and mapping suggestions.
 
 ## Requirements
-- Python 3.11+
-- Streamlit
-- pandas
-- ydata-profiling
-- requests
-- ollama (running locally)
+
+## ETL/Analytics (Script Mode)
+Use the scripts in `core/etl/` to load, validate, and analyze OMOP data with your choice of database backend (SQLite or PostgreSQL).
+
+### Example Usage
+```bash
+# Run ETL with SQLite (default)
+python core/etl/etl_load.py
+
+# Run ETL with PostgreSQL
+DB_USER=... DB_PASS=... DB_HOST=... DB_PORT=... DB_NAME=... python core/etl/etl_load.py --db_type postgresql
+
+# Run analytics/visualization
+python core/etl/analytics_visualization.py
+```
+
+See each script for details and options. The unified database utility in `utils/db_utils.py` supports both SQLite and PostgreSQL.
 
 ## License
 MIT
