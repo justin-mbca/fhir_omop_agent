@@ -79,26 +79,52 @@ This project implements a modern clinical data engineering workflow, integrating
 
 ```mermaid
 flowchart TD
-   subgraph SOURCE[Source/Data Layer]
-      S1[Healthcare Data Sources<br>EHR, Labs, Claims, Vendors]
-   end
-   subgraph ETL[ETL/Processing Layer]
-      E1[Ingestion & ETL<br>Python, Airflow, FHIR, USCDI]
-      E2[Terminology Mapping<br>ICD-10, SNOMED, RxNorm, LOINC, Athena]
-      E3[OMOP CDM Database<br>PostgreSQL, Oracle, SQL Server, Cloud]
-      E4[Data Quality & Metadata<br>Validation, Lineage]
-   end
-   subgraph ANALYTICS[Analytics/Reporting Layer]
-      A1[Analytics & Visualization<br>SQL, Python, R, Tableau, Power BI]
-      A2[Research, Reporting, Compliance<br>FDA, NIH, Life Science]
-   end
+   %% User Interaction
+   U1([User: Streamlit GUI])
 
-   S1 --> E1
-   E1 --> E2
-   E2 --> E3
-   E3 --> E4
-   E4 --> A1
-   A1 --> A2
+   %% Data Sources
+   FHIR1([FHIR Server])
+   ONCOKB([OncoKB API/CSV])
+   COSMIC([COSMIC TSV/CSV/URL])
+   CBIO([cBioPortal API/CSV])
+
+   %% LLM/AI
+   LLM1([LLM: Llama 2 / Mistral / TinyLlama])
+   LLM2([LLM: Mapping / QA / Chat])
+
+   %% OMOP/DB
+   OMOP1([OMOP SQLite/PostgreSQL DB])
+   QA([QA Copilot: ydata-profiling])
+
+   %% Analytics
+   ANALYTICS([Analytics & Visualization<br>Python, SQL, Power BI, Tableau])
+
+   %% Data Flow
+   U1 -- "Fetch FHIR" --> FHIR1
+   U1 -- "Load Oncology Data" --> ONCOKB
+   U1 -- "Load Oncology Data" --> COSMIC
+   U1 -- "Load Oncology Data" --> CBIO
+
+   U1 -- "LLM Chat" --> LLM1
+   U1 -- "LLM Mapping Playground" --> LLM2
+   U1 -- "Map to OMOP (AI/hard-coded)" --> LLM2
+
+   LLM2 -- "Suggest OMOP mapping / SQL" --> U1
+   LLM1 -- "Answer / SQL" --> U1
+
+   U1 -- "Insert/Map to OMOP" --> OMOP1
+   U1 -- "Run QA" --> QA
+
+   OMOP1 -- "Table Data" --> QA
+   QA -- "QA Report" --> U1
+
+   OMOP1 -- "Data for Analytics" --> ANALYTICS
+   ANALYTICS -- "Insights, Reports" --> U1
+
+   %% Layout hints for more spread
+   FHIR1 --- ONCOKB --- COSMIC --- CBIO
+   LLM1 --- LLM2
+   OMOP1 --- QA --- ANALYTICS
 ```
 
 ---
