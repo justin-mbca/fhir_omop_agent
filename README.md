@@ -88,6 +88,31 @@ fhir_omop_agent/
 
 ## Requirements
 
+## Unified Configuration
+All database, data, and output settings are managed in `config.yaml` at the project root. The Streamlit app, ETL, and analytics modules use these defaults, but you can override them via the GUI or CLI arguments.
+
+Example `config.yaml`:
+```yaml
+database:
+   backend: sqlite  # 'sqlite' or 'postgresql'
+   sqlite_path: omop_demo.db
+   postgresql:
+      user: clinical_user
+      password: StrongPassword123
+      host: localhost
+      port: 5432
+      db: clinical_demo
+data:
+   base_dir: data
+   person_sample: person_sample.csv
+   observation_sample: observation_sample.csv
+   code_mapping_sample: code_mapping_sample.csv
+docs:
+   output_dir: docs
+```
+
+You can edit this file to set your preferred defaults. The Streamlit sidebar and CLI options will always take precedence if set.
+
 ## ETL/Analytics (Script Mode)
 Use the scripts in `core/etl/` to load, validate, and analyze OMOP data with your choice of database backend (SQLite or PostgreSQL).
 

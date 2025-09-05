@@ -1,11 +1,13 @@
 # ETL script for OMOP CDM using both PostgreSQL and SQLite
 # Adapted from clinical_data_demo/etl/etl_load.py for integration
 
+
 import pandas as pd
 import os
 import sqlalchemy
 from sqlalchemy import create_engine
 from utils.db_utils import get_db_engine
+from utils.config_utils import load_config
 
 # Load OMOP CDM schema (PostgreSQL only)
 def load_omop_schema(engine, schema_path):
@@ -17,18 +19,29 @@ def load_omop_schema(engine, schema_path):
                 conn.execute(sqlalchemy.text(stmt))
 
 # Load sample data and mapping, run QA, and load to DB
-def run_etl(db_type='sqlite', db_path='omop_demo.db', pg_settings=None):
+
+def run_etl(db_type=None, db_path=None, pg_settings=None, config_path="config.yaml"):
     """
-    db_type: 'sqlite' or 'postgresql'
-    db_path: path to SQLite DB (if used)
-    pg_settings: dict with keys user, password, host, port, db (if PostgreSQL)
+    db_type: 'sqlite' or 'postgresql' (overrides config if set)
+    db_path: path to SQLite DB (if used, overrides config)
+    pg_settings: dict for PostgreSQL (overrides config)
+    config_path: path to config.yaml
     """
-    engine = get_db_engine(db_type=db_type, db_path=db_path, pg_settings=pg_settings)
+    config = load_config(config_path)
+    # Determine DB settings
+    db_type = db_type or config['database']['backend']
+    if db_type == 'sqlite':
+        db_path = db_path or config['database']['sqlite_path']
+        engine = get_db_engine(db_type=db_type, db_path=db_path)
+    else:
+        pg_settings = pg_settings or config['database']['postgresql']
+        engine = get_db_engine(db_type=db_type, pg_settings=pg_settings)
+    # Data paths
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    data_dir = os.path.join(base_dir, 'data')
-    person_df = pd.read_csv(os.path.join(data_dir, 'person_sample.csv'))
-    observation_df = pd.read_csv(os.path.join(data_dir, 'observation_sample.csv'))
-    mapping_path = os.path.join(data_dir, 'code_mapping_sample.csv')
+    data_dir = os.path.join(base_dir, config['data']['base_dir'])
+    person_df = pd.read_csv(os.path.join(data_dir, config['data']['person_sample']))
+    observation_df = pd.read_csv(os.path.join(data_dir, config['data']['observation_sample']))
+    mapping_path = os.path.join(data_dir, config['data']['code_mapping_sample'])
     if os.path.exists(mapping_path):
         mapping_df = pd.read_csv(mapping_path)
         obs_map = dict(zip(mapping_df['source_code'], mapping_df['standard_concept_id']))
@@ -38,6 +51,39 @@ def run_etl(db_type='sqlite', db_path='omop_demo.db', pg_settings=None):
             except:
                 return int(obs_map[val]) if val in obs_map else None
         observation_df['observation_concept_id'] = observation_df['observation_concept_id'].apply(map_concept_id)
+
+    # --- Automatic OMOP table creation for SQLite ---
+    if db_type == 'sqlite':
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        # Drop and recreate person table with all columns from sample data
+        cur.execute("DROP TABLE IF EXISTS person;")
+        cur.execute("""
+        CREATE TABLE person (
+            person_id INTEGER PRIMARY KEY,
+            gender_concept_id INTEGER,
+            year_of_birth INTEGER,
+            month_of_birth INTEGER,
+            day_of_birth INTEGER,
+            race_concept_id INTEGER,
+            ethnicity_concept_id INTEGER
+        )
+        """)
+        # Drop and recreate observation table with all columns from sample data
+        cur.execute("DROP TABLE IF EXISTS observation;")
+        cur.execute("""
+        CREATE TABLE observation (
+            observation_id INTEGER PRIMARY KEY,
+            person_id INTEGER,
+            observation_concept_id INTEGER,
+            observation_date TEXT,
+            value_as_number REAL,
+            value_as_string TEXT
+        )
+        """)
+        conn.commit()
+        conn.close()
     # Data quality checks (as before)
     errors = []
     if not person_df['person_id'].notnull().all():

@@ -1,15 +1,25 @@
 # Analytics and visualization for OMOP CDM tables
 # Adapted from clinical_data_demo/etl/analytics_visualization.py for integration
 
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
 from utils.db_utils import get_db_engine
+from utils.config_utils import load_config
 
-def run_analytics(db_type='sqlite', db_path='omop_demo.db', pg_settings=None):
-    engine = get_db_engine(db_type=db_type, db_path=db_path, pg_settings=pg_settings)
+
+def run_analytics(db_type=None, db_path=None, pg_settings=None, config_path="config.yaml"):
+    config = load_config(config_path)
+    db_type = db_type or config['database']['backend']
+    if db_type == 'sqlite':
+        db_path = db_path or config['database']['sqlite_path']
+        engine = get_db_engine(db_type=db_type, db_path=db_path)
+    else:
+        pg_settings = pg_settings or config['database']['postgresql']
+        engine = get_db_engine(db_type=db_type, pg_settings=pg_settings)
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    docs_dir = os.path.join(base_dir, 'docs')
+    docs_dir = os.path.join(base_dir, config['docs']['output_dir'])
     # Persons by gender
     gender_df = pd.read_sql("SELECT gender_concept_id, COUNT(*) as count FROM person GROUP BY gender_concept_id", engine)
     plt.figure()
@@ -38,4 +48,4 @@ def run_analytics(db_type='sqlite', db_path='omop_demo.db', pg_settings=None):
     plt.ylabel('Number of Observations')
     plt.tight_layout()
     plt.savefig(os.path.join(docs_dir, 'observations_per_year.png'))
-    print("Analytics complete: charts saved to docs/.")
+    print(f"Analytics complete: charts saved to {docs_dir}/.")

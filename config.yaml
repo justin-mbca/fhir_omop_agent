@@ -1,0 +1,21 @@
+# Unified configuration for OMOP Agent
+# Edit these values as needed. GUI/CLI/env can override.
+
+database:
+  backend: sqlite  # 'sqlite' or 'postgresql'
+  sqlite_path: omop_demo.db
+  postgresql:
+    user: clinical_user
+    password: StrongPassword123
+    host: localhost
+    port: 5432
+    db: clinical_demo
+
+data:
+  base_dir: data
+  person_sample: person_sample.csv
+  observation_sample: observation_sample.csv
+  code_mapping_sample: code_mapping_sample.csv
+
+docs:
+  output_dir: docs
