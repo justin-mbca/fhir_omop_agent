@@ -1,0 +1,11 @@
+{
+  "resourceType": "Condition",
+  "id": "12345",
+  "subject": { "reference": "Patient/67890" },
+  "code": {
+    "coding": [
+      { "system": "http://snomed.info/sct", "code": "44054006", "display": "Diabetes mellitus type 2" }
+    ]
+  },
+  "onsetDateTime": "2020-05-01"
+}
