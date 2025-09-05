@@ -37,9 +37,6 @@ flowchart TD
    U1 -- "Run QA" --> QA
    OMOP1 -- "Table Data" --> QA
    QA -- "QA Report" --> U1
-   %% AI Emphasis
-   classDef ai fill:#ffe4b2,stroke:#e67e22,stroke-width:2px;
-   LLM1,LLM2,QA class ai;
    %% Notes
    %% LLM1: Used for chat, prompt playground, and mapping suggestions
    %% LLM2: Used for mapping, QA, and SQL generation
