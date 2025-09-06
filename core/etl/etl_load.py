@@ -1,6 +1,7 @@
-# ETL script for OMOP CDM using both PostgreSQL and SQLite
-# Adapted from clinical_data_demo/etl/etl_load.py for integration
-
+"""
+ETL script for OMOP CDM using both PostgreSQL and SQLite
+Refactored for MCP orchestrator compatibility.
+"""
 
 import pandas as pd
 import os
@@ -9,7 +10,8 @@ from sqlalchemy import create_engine
 from utils.db_utils import get_db_engine
 from utils.config_utils import load_config
 
-# Load OMOP CDM schema (PostgreSQL only)
+__all__ = ["run_etl"]
+
 def load_omop_schema(engine, schema_path):
     with open(schema_path, 'r', encoding='utf-8') as f:
         schema_sql = f.read()
@@ -17,8 +19,6 @@ def load_omop_schema(engine, schema_path):
         for stmt in schema_sql.strip().split(';'):
             if stmt.strip():
                 conn.execute(sqlalchemy.text(stmt))
-
-# Load sample data and mapping, run QA, and load to DB
 
 def run_etl(db_type=None, db_path=None, pg_settings=None, config_path="config.yaml"):
     """
@@ -109,3 +109,8 @@ def run_etl(db_type=None, db_path=None, pg_settings=None, config_path="config.ya
     person_df.to_sql('person', engine, if_exists='append', index=False)
     observation_df.to_sql('observation', engine, if_exists='append', index=False)
     print("ETL complete: data loaded to OMOP tables.")
+
+
+# Script usage: python etl_load.py
+if __name__ == "__main__":
+    run_etl()

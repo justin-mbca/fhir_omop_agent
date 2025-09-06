@@ -1,6 +1,3 @@
-# Analytics and visualization for OMOP CDM tables
-# Adapted from clinical_data_demo/etl/analytics_visualization.py for integration
-
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,8 +5,13 @@ import os
 from utils.db_utils import get_db_engine
 from utils.config_utils import load_config
 
+__all__ = ["run_analytics"]
 
 def run_analytics(db_type=None, db_path=None, pg_settings=None, config_path="config.yaml"):
+    """
+    Analytics and visualization for OMOP CDM tables
+    Refactored for MCP orchestrator compatibility.
+    """
     config = load_config(config_path)
     db_type = db_type or config['database']['backend']
     if db_type == 'sqlite':
@@ -49,3 +51,8 @@ def run_analytics(db_type=None, db_path=None, pg_settings=None, config_path="con
     plt.tight_layout()
     plt.savefig(os.path.join(docs_dir, 'observations_per_year.png'))
     print(f"Analytics complete: charts saved to {docs_dir}/.")
+
+
+# Script usage: python analytics_visualization.py
+if __name__ == "__main__":
+    run_analytics()
