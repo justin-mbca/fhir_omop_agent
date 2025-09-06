@@ -1,19 +1,22 @@
 
+
+
 import streamlit as st
 import streamlit.components.v1 as components
 import json
 import pandas as pd
 import sqlite3
+import os
 from core.fhir_to_omop import fhir_to_omop_sql, client
 from core.qa_copilot import run_quality_checks
 from utils.db_utils import get_db_engine
 from utils.fhir_utils import extract_patient_id
-from core.etl import run_etl, run_analytics
-import os
 from utils.config_utils import load_config
+from core.orchestration.mcp_orchestrator import MCPOrchestrator
 
-# Sidebar DB config using config.yaml defaults
+# Load config at the very top so it's available for sidebar and all logic
 config = load_config()
+
 st.sidebar.header("Database Backend")
 default_backend = config['database']['backend']
 db_type = st.sidebar.selectbox("Select database backend", ["sqlite", "postgresql"], index=0 if default_backend=="sqlite" else 1)
@@ -32,6 +35,10 @@ else:
         'db': st.sidebar.text_input("PostgreSQL DB Name", value=pg_conf.get('db', 'clinical_demo')),
     }
 
+# Load config and instantiate orchestrator
+config = load_config()
+orchestrator = MCPOrchestrator(config_path="config.yaml")
+
 import streamlit as st
 import streamlit.components.v1 as components
 import json
@@ -43,7 +50,6 @@ from core.qa_copilot import run_quality_checks
 from utils.db_utils import connect_omop_db
 from utils.fhir_utils import extract_patient_id
 from core.etl import run_etl, run_analytics
-st.markdown("---")
 st.header("ETL & Analytics Jobs")
 st.write("Run OMOP ETL and analytics directly from the app. Uses sample data and your selected backend (default: SQLite).")
 
@@ -52,7 +58,7 @@ with col1:
     if st.button("Run ETL (Load Sample Data)"):
         with st.spinner("Running ETL job..."):
             try:
-                run_etl(db_type=db_type, db_path=db_path, pg_settings=pg_settings)
+                orchestrator.run_etl()
                 st.success("ETL complete: data loaded to OMOP tables.")
             except Exception as e:
                 st.error(f"ETL failed: {e}")
@@ -60,7 +66,7 @@ with col2:
     if st.button("Run Analytics (Generate Charts)"):
         with st.spinner("Running analytics job..."):
             try:
-                run_analytics(db_type=db_type, db_path=db_path, pg_settings=pg_settings)
+                orchestrator.run_analytics()
                 st.success("Analytics complete: charts saved to docs/.")
                 st.subheader("Analytics Results (Charts)")
                 chart_dir = os.path.join(os.path.dirname(__file__), "docs")
@@ -110,10 +116,8 @@ if st.button("Ask LLM"):
         st.warning("Please enter a question.")
 st.markdown("---")
 
-# --- LLM Prompt Playground ---
 st.header("LLM Mapping Prompt Playground")
 st.write("Use this tool to experiment with LLM prompts for FHIR → OMOP mapping or any data mapping. Enter a prompt and sample data, and see the LLM's output. Useful for learning and tuning.")
-
 mapping_models = ["llama2", "mistral", "tinyllama"]
 mapping_model = st.selectbox("Choose LLM model for mapping", mapping_models, index=0)
 default_prompt = "You are a biomedical data engineer. Map the following data to OMOP. Suggest the best OMOP table and field mapping for each column. Output as a table with columns: CSV Column, OMOP Table, OMOP Field, Mapping Rationale."
@@ -122,11 +126,15 @@ sample_data = st.text_area("Sample data (e.g., column names or JSON)", value="['
 
 if st.button("Run LLM Mapping"):
     try:
-        prompt = custom_prompt + "\n\nSample data:\n" + sample_data
-        st.info(f"Sending prompt to LLM model: {mapping_model} ...")
-        response = client.generate(model=mapping_model, prompt=prompt)
-        st.subheader("LLM Output (Mapping Suggestion)")
-        st.code(response['response'])
+        # Use orchestrator for LLM mapping
+        # Accept both JSON and CSV-style input for demo
+        try:
+            fhir_json = json.loads(sample_data)
+        except Exception:
+            fhir_json = {"columns": sample_data}
+        sql = orchestrator.run_llm_mapping(fhir_json, table="person")
+        st.subheader("LLM Output (OMOP SQL Suggestion)")
+        st.code(sql)
     except Exception as e:
         st.error(f"Error: {e}")
 
@@ -327,11 +335,33 @@ if resources:
 # Hybrid mapping: try hard-coded, fallback to LLM if error
 def map_patient_to_person(resource):
     try:
+        # Map FHIR Patient resource to OMOP person table (7 columns)
+        # Fallback to None if not present
+        def to_int(val):
+            try:
+                return int(val)
+            except (TypeError, ValueError):
+                return None
+
+        birth_date = resource.get('birthDate')
+        year = to_int(birth_date[:4]) if birth_date else None
+        month = to_int(birth_date[5:7]) if birth_date and len(birth_date) >= 7 else None
+        day = to_int(birth_date[8:10]) if birth_date and len(birth_date) >= 10 else None
+
+        # OMOP expects integer person_id, gender_concept_id, race_concept_id, ethnicity_concept_id
+        person_id = to_int(resource.get('id'))
+        gender_concept_id = None  # Could map from gender string if desired
+        race_concept_id = None
+        ethnicity_concept_id = None
+
         return (
-            resource.get('id'),
-            resource.get('gender'),
-            resource.get('birthDate'),
-            resource.get('deceasedDateTime')
+            person_id,
+            gender_concept_id,
+            year,
+            month,
+            day,
+            race_concept_id,
+            ethnicity_concept_id
         )
     except Exception:
         # Fallback: use LLM to generate SQL, parse values
@@ -340,8 +370,10 @@ def map_patient_to_person(resource):
         m = re.search(r"VALUES ?\((.*?)\)", sql, re.DOTALL)
         if m:
             vals = [v.strip().strip("'\"") for v in m.group(1).split(',')]
+            # Pad/truncate to 7 values
+            vals = (vals + [None]*7)[:7]
             return tuple(vals)
-        return (None, None, None, None)
+        return (None, None, None, None, None, None, None)
 
 def map_condition_to_condition_occurrence(resource):
     try:
@@ -394,14 +426,17 @@ if resources and last_resource_type in ["Patient", "Condition", "Encounter"]:
         if last_resource_type == "Patient":
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS person (
-                    person_id TEXT PRIMARY KEY,
-                    gender TEXT,
-                    birth_date TEXT,
-                    deceased_date TEXT
+                    person_id INTEGER PRIMARY KEY,
+                    gender_concept_id INTEGER,
+                    year_of_birth INTEGER,
+                    month_of_birth INTEGER,
+                    day_of_birth INTEGER,
+                    race_concept_id INTEGER,
+                    ethnicity_concept_id INTEGER
                 )
             """)
             rows = [map_patient_to_person(r) for r in resources]
-            cur.executemany("INSERT OR REPLACE INTO person VALUES (?, ?, ?, ?)", rows)
+            cur.executemany("INSERT OR REPLACE INTO person VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
             st.success(f"Inserted {len(rows)} Patient resources into OMOP person table.")
         elif last_resource_type == "Condition":
             cur.execute("""
@@ -470,11 +505,30 @@ if table_list:
         csv_path = f"{selected_table}.csv"
         df.to_csv(csv_path, index=False)
         output_path = f"qa_report_{selected_table}.html"
-        run_quality_checks(csv_path, output_path)
+        orchestrator.run_qa(csv_path, output_path)
         st.success(f"QA Report generated: {output_path}")
         with open(output_path, "r", encoding="utf-8") as f:
             html_content = f.read()
         components.html(html_content, height=800, scrolling=True)
 else:
     st.info("No OMOP tables found in omop_demo.db.")
+
 conn.close()
+
+# --- Full MCP Pipeline Button ---
+st.markdown("---")
+st.header("Run Full MCP Pipeline (Demo)")
+if st.button("Run Full MCP Pipeline"):
+    # Example: orchestrate all steps with sample FHIR JSON and table
+    fhir_json = {"resourceType": "Patient", "id": "123", "gender": "female", "birthDate": "1980-01-01"}
+    qa_csv = "person.csv"
+    qa_html = "qa_report_person.html"
+    results = orchestrator.orchestrate(
+        steps=['etl', 'llm_mapping', 'qa', 'analytics'],
+        fhir_json=fhir_json,
+        table="person",
+        qa_csv=qa_csv,
+        qa_html=qa_html
+    )
+    st.success("Full MCP pipeline complete!")
+    st.json(results)

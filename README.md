@@ -1,8 +1,47 @@
+# Recent Updates (September 2025)
+
+### Bug Fixes & Improvements
+
+- Fixed ETL and QA file path handling: All file paths are now resolved using `config.yaml` and robust path logic in the MCP orchestrator. No more hardcoded or missing file errors.
+- Improved FHIR → OMOP mapping for the `person` table: The mapping now matches the OMOP schema (7 columns) and ensures all values are integers or `None` as required by the database, preventing datatype mismatch errors.
+- Enhanced error handling: The app now provides clearer error messages for missing files, schema mismatches, and datatype issues.
+- Streamlit UI and full MCP pipeline: The "Run Full MCP Pipeline" button now works end-to-end, routing all steps (ETL, LLM mapping, QA, analytics) through the orchestrator.
+- Documentation and code comments updated to reflect these changes.
+
+### FHIR → OMOP Person Table Mapping
+
+The mapping from FHIR Patient resources to the OMOP `person` table now follows this logic:
+
+- `person_id`: FHIR `id` (converted to integer if possible)
+- `gender_concept_id`: Not mapped by default (set to `None`), but can be extended to map gender strings to OMOP concept IDs
+- `year_of_birth`, `month_of_birth`, `day_of_birth`: Parsed from FHIR `birthDate` (YYYY-MM-DD)
+- `race_concept_id`, `ethnicity_concept_id`: Not mapped by default (set to `None`), but can be extended
+
+All values are cast to integers or set to `None` to match the OMOP schema and avoid database errors.
+
+### Configuration
+
+All file paths, database settings, and output directories are managed in `config.yaml`. The orchestrator and all modules use this config for robust, portable execution.
+
+---
 # FHIR → OMOP Agent + QA Copilot
 
 
 
+
 This app demonstrates a local, LLM-powered pipeline for mapping FHIR resources to OMOP tables, running data quality checks, and experimenting with LLM prompts—all from a Streamlit GUI. The project is organized for extensibility, with a modular folder structure for future integrations (e.g., oncology DB, on-premise DB).
+
+---
+
+## MCP Orchestration Layer (NEW)
+
+**This project now features a modular MCP Orchestrator, which coordinates the entire FHIR → OMOP + QA pipeline.**
+
+- All ETL, analytics, LLM mapping, and QA steps are now orchestrated via a unified `MCPOrchestrator` class (see `core/orchestration/mcp_orchestrator.py`).
+- The Streamlit UI routes all ETL, analytics, LLM mapping, and QA actions through the orchestrator, matching the architecture diagram.
+- A new "Run Full MCP Pipeline" button in the UI executes the entire workflow in one click.
+- This enables stepwise execution, logging, and future extensibility for distributed or async orchestration.
+
 
 ---
 
@@ -84,6 +123,11 @@ flowchart TD
       U1([User: Streamlit GUI])
    end
 
+   %% MCP Orchestration
+   subgraph MCP[MCP Orchestrator]
+      MCP1([MCP Orchestration Layer])
+   end
+
    %% Data Sources
    subgraph SOURCES[Data Sources]
       FHIR1([FHIR Server])
@@ -109,27 +153,30 @@ flowchart TD
       ANALYTICS1([Python, SQL, Power BI, Tableau])
    end
 
-   %% Data Flow
-   U1 -- "Fetch FHIR" --> FHIR1
-   U1 -- "Load Oncology Data" --> ONCOKB
-   U1 -- "Load Oncology Data" --> COSMIC
-   U1 -- "Load Oncology Data" --> CBIO
+   %% Data Flow via MCP
+   U1 -- "Request" --> MCP1
+   MCP1 -- "Fetch FHIR" --> FHIR1
+   MCP1 -- "Load Oncology Data" --> ONCOKB
+   MCP1 -- "Load Oncology Data" --> COSMIC
+   MCP1 -- "Load Oncology Data" --> CBIO
 
-   U1 -- "LLM Chat" --> LLM1
-   U1 -- "LLM Mapping Playground" --> LLM2
-   U1 -- "Map to OMOP (AI/hard-coded)" --> LLM2
+   MCP1 -- "LLM Chat" --> LLM1
+   MCP1 -- "LLM Mapping Playground" --> LLM2
+   MCP1 -- "Map to OMOP (AI/hard-coded)" --> LLM2
 
-   LLM2 -- "Suggest OMOP mapping / SQL" --> U1
-   LLM1 -- "Answer / SQL" --> U1
+   LLM2 -- "Suggest OMOP mapping / SQL" --> MCP1
+   LLM1 -- "Answer / SQL" --> MCP1
 
-   U1 -- "Insert/Map to OMOP" --> OMOP1
-   U1 -- "Run QA" --> QA
+   MCP1 -- "Insert/Map to OMOP" --> OMOP1
+   MCP1 -- "Run QA" --> QA
 
    OMOP1 -- "Table Data" --> QA
-   QA -- "QA Report" --> U1
+   QA -- "QA Report" --> MCP1
 
    OMOP1 -- "Data for Analytics" --> ANALYTICS1
-   ANALYTICS1 -- "Insights, Reports" --> U1
+   ANALYTICS1 -- "Insights, Reports" --> MCP1
+
+   MCP1 -- "Results" --> U1
 
    %% Layout hints for more spread
    FHIR1 --- ONCOKB --- COSMIC --- CBIO
@@ -139,11 +186,13 @@ flowchart TD
 
 ---
 
+
 ## Features
 
+- **MCP Orchestration Layer:** Unified orchestrator for ETL, analytics, LLM mapping, and QA (see architecture diagram)
 - Modular codebase for easy extension and maintenance
 - LLM Chat: ask any question to the LLM (choose model for speed/quality)
-- LLM Mapping Prompt Playground: experiment with custom prompts and any data (e.g., CSV columns, FHIR JSON) for OMOP mapping suggestions
+- LLM Mapping Prompt Playground: experiment with custom prompts and any data (e.g., CSV columns, FHIR JSON) for OMOP mapping suggestions, now routed through the orchestrator
 - Oncology Data Loader Demos:
    - OncoKB: Load via API (institutional email required) or upload CSV
    - COSMIC: Upload TSV/CSV or load from public URL
@@ -151,8 +200,9 @@ flowchart TD
 - Fetch FHIR resources (Patient, Condition, Encounter, and more) from the public HAPI FHIR server
 - Review FHIR resources in table format
 - Map FHIR resources to OMOP tables (person, condition_occurrence, visit_occurrence) using robust Python logic with LLM fallback
-- Run QA profiling on OMOP tables (ydata-profiling)
-- Generate OMOP SQL from FHIR JSON using LLM (Llama 2, Mistral, TinyLlama via Ollama)
+- Run QA profiling on OMOP tables (ydata-profiling), now routed through the orchestrator
+- Generate OMOP SQL from FHIR JSON using LLM (Llama 2, Mistral, TinyLlama via Ollama), now via orchestrator
+- **Run Full MCP Pipeline:** One-click button in the UI to execute ETL, LLM mapping, QA, and analytics in sequence
 
 ## Project Structure
 
@@ -181,17 +231,19 @@ flowchart TD
 - Place sample or external data in `data/`
 
 
+
 ## Usage
 
 - **LLM Chat:** Ask any question to the LLM (choose model for speed/quality).
-- **LLM Mapping Prompt Playground:** Enter a custom prompt and sample data (e.g., CSV columns, FHIR JSON) to get OMOP mapping suggestions from the LLM.
+- **LLM Mapping Prompt Playground:** Enter a custom prompt and sample data (e.g., CSV columns, FHIR JSON) to get OMOP mapping suggestions from the LLM. Now uses the MCP orchestrator for all mapping logic.
 - **Oncology Data Loader Demos:**
    - **OncoKB:** Enter API token and gene, or upload a CSV file. Preview and analyze variant data.
    - **COSMIC:** Upload a COSMIC TSV/CSV file or enter a public URL. Preview and analyze mutation data.
    - **cBioPortal:** Enter a study ID to fetch clinical/molecular data via API, or upload a CSV. List and fetch available molecular profiles (mutation, copy number, mRNA, etc.).
 - **FHIR Resource Viewer:** Fetch and review FHIR resources from the HAPI FHIR server. Select resource type and number of rows.
 - **Map to OMOP:** After fetching Patient, Condition, or Encounter, click "Map to OMOP" to populate the OMOP SQLite database (`omop_demo.db`).
-- **Run QA:** Select an OMOP table and run data profiling (QA) with ydata-profiling.
+- **Run QA:** Select an OMOP table and run data profiling (QA) with ydata-profiling. Now uses the MCP orchestrator for all QA logic.
+- **Run Full MCP Pipeline:** Click the "Run Full MCP Pipeline" button to execute ETL, LLM mapping, QA, and analytics in sequence, with results shown in the UI.
 
 ## Notes
 
@@ -243,7 +295,45 @@ DB_USER=... DB_PASS=... DB_HOST=... DB_PORT=... DB_NAME=... python core/etl/etl_
 python core/etl/analytics_visualization.py
 ```
 
+
 See each script for details and options. The unified database utility in `utils/db_utils.py` supports both SQLite and PostgreSQL.
+
+---
+
+## MCP Orchestrator Example (Script Mode)
+
+You can also use the orchestrator directly in a script or notebook:
+
+```python
+from core.orchestration.mcp_orchestrator import MCPOrchestrator
+
+# Instantiate orchestrator (uses config.yaml by default)
+orchestrator = MCPOrchestrator()
+
+# Example FHIR resource (replace with your actual FHIR JSON)
+fhir_json = {
+   "resourceType": "Patient",
+   "id": "123",
+   "gender": "female",
+   "birthDate": "1980-01-01"
+}
+
+# Path to CSV and output HTML for QA (replace with your actual file/table)
+qa_csv = "person.csv"
+qa_html = "qa_report_person.html"
+
+# Run the full pipeline
+results = orchestrator.orchestrate(
+   steps=['etl', 'llm_mapping', 'qa', 'analytics'],
+   fhir_json=fhir_json,
+   table="person",
+   qa_csv=qa_csv,
+   qa_html=qa_html
+)
+
+print("Pipeline results:")
+print(results)
+```
 
 ## License
 MIT
