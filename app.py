@@ -1,5 +1,68 @@
 
 
+import streamlit as st
+import streamlit.components.v1 as components
+import json
+import pandas as pd
+import sqlite3
+import os
+from core.fhir_to_omop import fhir_to_omop_sql, client
+from core.qa_copilot import run_quality_checks
+from utils.db_utils import get_db_engine
+from utils.fhir_utils import extract_patient_id
+from utils.config_utils import load_config
+from core.orchestration.mcp_orchestrator import MCPOrchestrator
+
+# Initialize SQLAlchemy engine for database access
+engine = get_db_engine()
+
+# --- Cohort Selection & Filtering ---
+st.markdown("---")
+st.header("Cohort Selection & Filtering")
+st.write("Interactively filter OMOP tables and view the results. Useful for cohort discovery and data exploration.")
+
+table_options = ["person", "observation", "condition_occurrence", "procedure_occurrence"]
+selected_table = st.selectbox("Select OMOP table to filter", table_options)
+
+df = None
+try:
+    df = pd.read_sql(f"SELECT * FROM {selected_table}", engine)
+except Exception as e:
+    st.info(f"Could not load {selected_table} table: {e}")
+
+if df is not None:
+    st.write(f"**{selected_table} table: {len(df)} rows**")
+    # Show filter widgets for common columns
+    filter_cols = [col for col in df.columns if df[col].dtype in ["int64", "float64"] or "date" in col or "concept_id" in col]
+    filters = {}
+    for col in filter_cols:
+        if "date" in col:
+            min_date = pd.to_datetime(df[col], errors="coerce").min()
+            max_date = pd.to_datetime(df[col], errors="coerce").max()
+            val = st.date_input(f"Filter {col}", value=(min_date, max_date))
+            filters[col] = val
+        elif "concept_id" in col:
+            unique_vals = sorted(df[col].dropna().unique())
+            val = st.multiselect(f"Filter {col}", unique_vals, default=unique_vals)
+            filters[col] = val
+        else:
+            min_val = int(df[col].min()) if not pd.isnull(df[col].min()) else 0
+            max_val = int(df[col].max()) if not pd.isnull(df[col].max()) else 0
+            val = st.slider(f"Filter {col}", min_val, max_val, (min_val, max_val))
+            filters[col] = val
+    # Apply filters
+    df_filtered = df.copy()
+    for col, val in filters.items():
+        if "date" in col:
+            df_filtered = df_filtered[(pd.to_datetime(df_filtered[col], errors="coerce") >= pd.to_datetime(val[0])) & (pd.to_datetime(df_filtered[col], errors="coerce") <= pd.to_datetime(val[1]))]
+        elif "concept_id" in col:
+            df_filtered = df_filtered[df_filtered[col].isin(val)]
+        else:
+            df_filtered = df_filtered[(df_filtered[col] >= val[0]) & (df_filtered[col] <= val[1])]
+    st.dataframe(df_filtered)
+    st.write(f"Filtered rows: {len(df_filtered)}")
+
+
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -39,16 +102,7 @@ else:
 config = load_config()
 orchestrator = MCPOrchestrator(config_path="config.yaml")
 
-import streamlit as st
-import streamlit.components.v1 as components
-import json
-import pandas as pd
-import sqlite3
 import requests
-from core.fhir_to_omop import fhir_to_omop_sql, client
-from core.qa_copilot import run_quality_checks
-from utils.db_utils import connect_omop_db
-from utils.fhir_utils import extract_patient_id
 from core.etl import run_etl, run_analytics
 st.header("ETL & Analytics Jobs")
 st.write("Run OMOP ETL and analytics directly from the app. Uses sample data and your selected backend (default: SQLite).")
