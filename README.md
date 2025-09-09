@@ -1,12 +1,13 @@
 # Recent Updates (September 2025)
 
-### Bug Fixes & Improvements
 
-- Fixed ETL and QA file path handling: All file paths are now resolved using `config.yaml` and robust path logic in the MCP orchestrator. No more hardcoded or missing file errors.
-- Improved FHIR → OMOP mapping for the `person` table: The mapping now matches the OMOP schema (7 columns) and ensures all values are integers or `None` as required by the database, preventing datatype mismatch errors.
-- Enhanced error handling: The app now provides clearer error messages for missing files, schema mismatches, and datatype issues.
-- Streamlit UI and full MCP pipeline: The "Run Full MCP Pipeline" button now works end-to-end, routing all steps (ETL, LLM mapping, QA, analytics) through the orchestrator.
-- Documentation and code comments updated to reflect these changes.
+### Major Feature: Standardized OMOP Tables & Analytics (September 2025)
+
+- Added support for standardized OMOP tables: `condition_occurrence` and `procedure_occurrence`, with concept ID mapping for ICD-10, SNOMED, LOINC, and CPT codes.
+- New sample data: `data/condition_sample.csv` and `data/procedure_sample.csv` for demo and testing.
+- ETL pipeline now loads, maps, and validates these tables, with robust QA and referential integrity checks.
+- Analytics and charts for top conditions/procedures, counts per person, and yearly trends are generated and displayed in the Streamlit GUI.
+- All new tables are previewed in the GUI after ETL runs, making demos and validation easy.
 
 ### FHIR → OMOP Person Table Mapping
 
@@ -49,51 +50,57 @@ This app demonstrates a local, LLM-powered pipeline for mapping FHIR resources t
 
 ```mermaid
 flowchart TD
-    %% User Interaction
-    U1([User: Streamlit GUI])
+   %% User Interaction
+   U1([User: Streamlit GUI])
 
-    %% Data Sources
-    FHIR1([FHIR Server])
-    ONCOKB([OncoKB API/CSV])
-    COSMIC([COSMIC TSV/CSV/URL])
-    CBIO([cBioPortal API/CSV])
+   %% Data Sources
+   FHIR1([FHIR Server])
+   ONCOKB([OncoKB API/CSV])
+   COSMIC([COSMIC TSV/CSV/URL])
+   CBIO([cBioPortal API/CSV])
 
-    %% LLM/AI
-    LLM1([LLM: Llama 2 / Mistral / TinyLlama])
-    LLM2([LLM: Mapping / QA / Chat])
+   %% LLM/AI
+   LLM1([LLM: Llama 2 / Mistral / TinyLlama])
+   LLM2([LLM: Mapping / QA / Chat])
 
-    %% OMOP/DB
-    OMOP1([OMOP SQLite DB])
-    QA([QA Copilot: ydata-profiling])
+   %% OMOP/DB
+   OMOP1([OMOP SQLite DB])
+   PERSON([person])
+   OBS([observation])
+   COND([condition_occurrence])
+   PROC([procedure_occurrence])
+   QA([QA Copilot: ydata-profiling])
 
-    %% Data Flow
-    U1 -- "Fetch FHIR" --> FHIR1
-    U1 -- "Load Oncology Data" --> ONCOKB
-    U1 -- "Load Oncology Data" --> COSMIC
-    U1 -- "Load Oncology Data" --> CBIO
+   %% Data Flow
+   U1 -- "Fetch FHIR" --> FHIR1
+   U1 -- "Load Oncology Data" --> ONCOKB
+   U1 -- "Load Oncology Data" --> COSMIC
+   U1 -- "Load Oncology Data" --> CBIO
 
-    U1 -- "LLM Chat" --> LLM1
-    U1 -- "LLM Mapping Playground" --> LLM2
-    U1 -- "Map to OMOP (AI/hard-coded)" --> LLM2
+   U1 -- "LLM Chat" --> LLM1
+   U1 -- "LLM Mapping Playground" --> LLM2
+   U1 -- "Map to OMOP (AI/hard-coded)" --> LLM2
 
-    LLM2 -- "Suggest OMOP mapping / SQL" --> U1
-    LLM1 -- "Answer / SQL" --> U1
+   LLM2 -- "Suggest OMOP mapping / SQL" --> U1
+   LLM1 -- "Answer / SQL" --> U1
 
-    U1 -- "Insert/Map to OMOP" --> OMOP1
-    U1 -- "Run QA" --> QA
+   U1 -- "Insert/Map to OMOP" --> OMOP1
+   OMOP1 -- "person" --> PERSON
+   OMOP1 -- "observation" --> OBS
+   OMOP1 -- "condition_occurrence" --> COND
+   OMOP1 -- "procedure_occurrence" --> PROC
 
-    OMOP1 -- "Table Data" --> QA
-    QA -- "QA Report" --> U1
+   PERSON -- "Table Data" --> QA
+   OBS -- "Table Data" --> QA
+   COND -- "Table Data" --> QA
+   PROC -- "Table Data" --> QA
+   QA -- "QA Report" --> U1
 
-    %% Layout hints for more spread
-    FHIR1 --- ONCOKB --- COSMIC --- CBIO
-    LLM1 --- LLM2
-    OMOP1 --- QA
-
-    %% Notes
-    %% LLM1: Used for chat, prompt playground, and mapping suggestions
-    %% LLM2: Used for mapping, QA, and SQL generation
-    %% QA: Automated profiling and data quality (AI-powered)
+   %% Layout hints for more spread
+   FHIR1 --- ONCOKB --- COSMIC --- CBIO
+   LLM1 --- LLM2
+   PERSON --- OBS --- COND --- PROC
+   OMOP1 --- QA
 ```
 
 **Diagram: Technical & Data Process with AI/LLM Emphasis**
@@ -107,9 +114,9 @@ flowchart TD
 
 This project implements a modern clinical data engineering workflow, integrating healthcare standards, terminologies, databases, and analytics tools:
 
-1. **Healthcare Data Sources:** EHRs, labs, registries, claims, and vendors provide data, often in HL7 FHIR format and containing USCDI-required elements. Example files: `data/person_sample.csv`, `data/observation_sample.csv`.
+1. **Healthcare Data Sources:** EHRs, labs, registries, claims, and vendors provide data, often in HL7 FHIR format and containing USCDI-required elements. Example files: `data/person_sample.csv`, `data/observation_sample.csv`, `data/condition_sample.csv`, `data/procedure_sample.csv`.
 2. **Ingestion & ETL:** ETL pipelines (e.g., `core/etl/etl_load.py`) extract data from FHIR APIs, files, or databases, transform and map fields/codes to OMOP CDM tables and vocabularies (using mapping tables or vocabularies from Athena), and load harmonized data into relational databases (PostgreSQL, Oracle, SQL Server).
-3. **Terminology Mapping:** Local codes (ICD-10, SNOMED, LOINC, etc.) are mapped to OMOP standard concept IDs using mapping tables or vocabularies. OMOP vocabularies are typically downloaded in bulk from the OHDSI Athena platform (https://athena.ohdsi.org/) and loaded into your database for use in the ETL process. See `data/code_mapping_sample.csv` for a demo.
+3. **Terminology Mapping:** Local codes (ICD-10, SNOMED, LOINC, CPT, etc.) are mapped to OMOP standard concept IDs using mapping tables or vocabularies. OMOP vocabularies are typically downloaded in bulk from the OHDSI Athena platform (https://athena.ohdsi.org/) and loaded into your database for use in the ETL process. See `data/code_mapping_sample.csv` for a demo. The mapping logic is now generalized and applied to all *_concept_id fields in the pipeline.
 4. **OMOP CDM Database:** OMOP CDM data is stored in scalable RDBMS or cloud data warehouses and can be integrated with data lakes for large-scale analytics. Schema: `docs/omop_cdm_schema.sql`.
 5. **Data Quality & Metadata:** Automated validation checks for completeness, consistency, referential integrity, and code mapping are included in the ETL script. Data lineage and transformation steps are documented in the code and README.
 6. **Analytics, Visualization, and Reporting:** SQL, Python (pandas, matplotlib), R, Tableau, and Power BI are used for cohort selection, EDA, modeling, dashboards, and regulatory reporting. See `core/etl/analytics_visualization.py` and charts in `docs/`.
@@ -145,6 +152,10 @@ flowchart TD
    %% OMOP/DB
    subgraph OMOP[OMOP & QA]
       OMOP1([OMOP SQLite/PostgreSQL DB])
+      PERSON([person])
+      OBS([observation])
+      COND([condition_occurrence])
+      PROC([procedure_occurrence])
       QA([QA Copilot: ydata-profiling])
    end
 
@@ -168,9 +179,15 @@ flowchart TD
    LLM1 -- "Answer / SQL" --> MCP1
 
    MCP1 -- "Insert/Map to OMOP" --> OMOP1
-   MCP1 -- "Run QA" --> QA
+   OMOP1 -- "person" --> PERSON
+   OMOP1 -- "observation" --> OBS
+   OMOP1 -- "condition_occurrence" --> COND
+   OMOP1 -- "procedure_occurrence" --> PROC
 
-   OMOP1 -- "Table Data" --> QA
+   PERSON -- "Table Data" --> QA
+   OBS -- "Table Data" --> QA
+   COND -- "Table Data" --> QA
+   PROC -- "Table Data" --> QA
    QA -- "QA Report" --> MCP1
 
    OMOP1 -- "Data for Analytics" --> ANALYTICS1
@@ -181,6 +198,7 @@ flowchart TD
    %% Layout hints for more spread
    FHIR1 --- ONCOKB --- COSMIC --- CBIO
    LLM1 --- LLM2
+   PERSON --- OBS --- COND --- PROC
    OMOP1 --- QA --- ANALYTICS1
 ```
 
@@ -199,10 +217,11 @@ flowchart TD
    - cBioPortal: Load clinical/molecular data via API (study ID) or upload CSV; list and fetch available molecular profiles (mutation, copy number, mRNA, etc.)
 - Fetch FHIR resources (Patient, Condition, Encounter, and more) from the public HAPI FHIR server
 - Review FHIR resources in table format
-- Map FHIR resources to OMOP tables (person, condition_occurrence, visit_occurrence) using robust Python logic with LLM fallback
+- Map FHIR resources to OMOP tables (person, condition_occurrence, procedure_occurrence, visit_occurrence) using robust Python logic with LLM fallback
 - Run QA profiling on OMOP tables (ydata-profiling), now routed through the orchestrator
 - Generate OMOP SQL from FHIR JSON using LLM (Llama 2, Mistral, TinyLlama via Ollama), now via orchestrator
 - **Run Full MCP Pipeline:** One-click button in the UI to execute ETL, LLM mapping, QA, and analytics in sequence
+- **Preview and Analytics for All Tables:** After ETL, the GUI previews all major OMOP tables (person, observation, condition_occurrence, procedure_occurrence) and displays analytics charts for each, including top codes, counts per person, and yearly trends.
 
 ## Project Structure
 
@@ -273,6 +292,8 @@ data:
    base_dir: data
    person_sample: person_sample.csv
    observation_sample: observation_sample.csv
+   condition_sample: condition_sample.csv
+   procedure_sample: procedure_sample.csv
    code_mapping_sample: code_mapping_sample.csv
 docs:
    output_dir: docs

@@ -1,0 +1,5 @@
+procedure_occurrence_id,person_id,procedure_concept_id,procedure_date,procedure_source_value
+1,1,LOINC_789,2022-05-18,LOINC_789
+2,2,LOINC_456,2022-06-25,LOINC_456
+3,3,ICD10_A10,2022-07-30,ICD10_A10
+4,4,SCT_654321,2022-08-15,SCT_654321

@@ -73,7 +73,13 @@ with col2:
                 chart_files = [
                     ("Persons by Gender", "persons_by_gender.png"),
                     ("Age Distribution", "age_distribution.png"),
-                    ("Observations per Year", "observations_per_year.png")
+                    ("Observations per Year", "observations_per_year.png"),
+                    ("Top 10 Conditions", "top_conditions.png"),
+                    ("Conditions per Person", "conditions_per_person.png"),
+                    ("Condition Occurrences by Year", "condition_by_year.png"),
+                    ("Top 10 Procedures", "top_procedures.png"),
+                    ("Procedures per Person", "procedures_per_person.png"),
+                    ("Procedures by Year", "procedure_by_year.png")
                 ]
                 for title, fname in chart_files:
                     fpath = os.path.join(chart_dir, fname)
@@ -86,18 +92,34 @@ with col2:
                 st.error(f"Analytics failed: {e}")
 # Always show OMOP data preview after ETL/analytics, regardless of which button was clicked
 engine = get_db_engine(db_type=db_type, db_path=db_path, pg_settings=pg_settings)
+
 st.subheader("Preview: person table")
 try:
     df_person = pd.read_sql("SELECT * FROM person LIMIT 10", engine)
     st.dataframe(df_person)
 except Exception as e:
     st.info(f"Could not load person table: {e}")
+
 st.subheader("Preview: observation table")
 try:
     df_obs = pd.read_sql("SELECT * FROM observation LIMIT 10", engine)
     st.dataframe(df_obs)
 except Exception as e:
     st.info(f"Could not load observation table: {e}")
+
+st.subheader("Preview: condition_occurrence table")
+try:
+    df_cond = pd.read_sql("SELECT * FROM condition_occurrence LIMIT 10", engine)
+    st.dataframe(df_cond)
+except Exception as e:
+    st.info(f"Could not load condition_occurrence table: {e}")
+
+st.subheader("Preview: procedure_occurrence table")
+try:
+    df_proc = pd.read_sql("SELECT * FROM procedure_occurrence LIMIT 10", engine)
+    st.dataframe(df_proc)
+except Exception as e:
+    st.info(f"Could not load procedure_occurrence table: {e}")
 
 
 # --- LLM Q&A Chat Box ---

@@ -8,6 +8,81 @@ from utils.config_utils import load_config
 __all__ = ["run_analytics"]
 
 def run_analytics(db_type=None, db_path=None, pg_settings=None, config_path="config.yaml"):
+    # --- CONDITION_OCCURRENCE ANALYTICS ---
+    try:
+        cond_df = pd.read_sql("SELECT * FROM condition_occurrence", engine)
+        # Top 10 conditions
+        top_conditions = cond_df['condition_concept_id'].value_counts().head(10)
+        plt.figure()
+        top_conditions.plot.bar()
+        plt.title('Top 10 Conditions (Standard Concept ID)')
+        plt.xlabel('Condition Concept ID')
+        plt.ylabel('Count')
+        plt.tight_layout()
+        plt.savefig(os.path.join(docs_dir, 'top_conditions.png'))
+        # Conditions per person
+        cond_per_person = cond_df.groupby('person_id').size()
+        plt.figure()
+        cond_per_person.plot.hist(bins=10)
+        plt.title('Conditions per Person')
+        plt.xlabel('Number of Conditions')
+        plt.ylabel('Number of Persons')
+        plt.tight_layout()
+        plt.savefig(os.path.join(docs_dir, 'conditions_per_person.png'))
+        # Condition start date distribution
+        cond_dates = pd.to_datetime(cond_df['condition_start_date'], errors='coerce')
+        plt.figure()
+        cond_dates.dt.year.value_counts().sort_index().plot.bar()
+        plt.title('Condition Occurrences by Year')
+        plt.xlabel('Year')
+        plt.ylabel('Number of Conditions')
+        plt.tight_layout()
+        plt.savefig(os.path.join(docs_dir, 'condition_by_year.png'))
+        # QA checks
+        print("\n[QA] condition_occurrence table:")
+        print(f"Null condition_concept_id: {cond_df['condition_concept_id'].isnull().sum()}")
+        print(f"Null person_id: {cond_df['person_id'].isnull().sum()}")
+        print(f"Duplicate rows: {cond_df.duplicated().sum()}")
+    except Exception as e:
+        print(f"[WARN] Could not analyze condition_occurrence: {e}")
+
+    # --- PROCEDURE_OCCURRENCE ANALYTICS ---
+    try:
+        proc_df = pd.read_sql("SELECT * FROM procedure_occurrence", engine)
+        # Top 10 procedures
+        top_procs = proc_df['procedure_concept_id'].value_counts().head(10)
+        plt.figure()
+        top_procs.plot.bar()
+        plt.title('Top 10 Procedures (Standard Concept ID)')
+        plt.xlabel('Procedure Concept ID')
+        plt.ylabel('Count')
+        plt.tight_layout()
+        plt.savefig(os.path.join(docs_dir, 'top_procedures.png'))
+        # Procedures per person
+        proc_per_person = proc_df.groupby('person_id').size()
+        plt.figure()
+        proc_per_person.plot.hist(bins=10)
+        plt.title('Procedures per Person')
+        plt.xlabel('Number of Procedures')
+        plt.ylabel('Number of Persons')
+        plt.tight_layout()
+        plt.savefig(os.path.join(docs_dir, 'procedures_per_person.png'))
+        # Procedure date distribution
+        proc_dates = pd.to_datetime(proc_df['procedure_date'], errors='coerce')
+        plt.figure()
+        proc_dates.dt.year.value_counts().sort_index().plot.bar()
+        plt.title('Procedures by Year')
+        plt.xlabel('Year')
+        plt.ylabel('Number of Procedures')
+        plt.tight_layout()
+        plt.savefig(os.path.join(docs_dir, 'procedure_by_year.png'))
+        # QA checks
+        print("\n[QA] procedure_occurrence table:")
+        print(f"Null procedure_concept_id: {proc_df['procedure_concept_id'].isnull().sum()}")
+        print(f"Null person_id: {proc_df['person_id'].isnull().sum()}")
+        print(f"Duplicate rows: {proc_df.duplicated().sum()}")
+    except Exception as e:
+        print(f"[WARN] Could not analyze procedure_occurrence: {e}")
     """
     Analytics and visualization for OMOP CDM tables
     Refactored for MCP orchestrator compatibility.
