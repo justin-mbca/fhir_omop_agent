@@ -1,3 +1,9 @@
+# Major Feature: Interactive Cohort Selection & Filtering (September 2025)
+
+- Added an interactive cohort selection and filtering section to the Streamlit GUI.
+- Users can select any OMOP table (person, observation, condition_occurrence, procedure_occurrence), apply filters on columns (including date ranges and concept IDs), and view the filtered results instantly.
+- This feature enables rapid cohort discovery, data exploration, and validation directly from the app interface.
+
 # Recent Updates (September 2025)
 
 
@@ -222,6 +228,7 @@ flowchart TD
 - Generate OMOP SQL from FHIR JSON using LLM (Llama 2, Mistral, TinyLlama via Ollama), now via orchestrator
 - **Run Full MCP Pipeline:** One-click button in the UI to execute ETL, LLM mapping, QA, and analytics in sequence
 - **Preview and Analytics for All Tables:** After ETL, the GUI previews all major OMOP tables (person, observation, condition_occurrence, procedure_occurrence) and displays analytics charts for each, including top codes, counts per person, and yearly trends.
+ - **Interactive Cohort Selection & Filtering:** Instantly filter and explore OMOP tables in the GUI by column, date, or concept ID. Useful for cohort discovery and data validation.
 
 ## Project Structure
 
@@ -263,6 +270,7 @@ flowchart TD
 - **Map to OMOP:** After fetching Patient, Condition, or Encounter, click "Map to OMOP" to populate the OMOP SQLite database (`omop_demo.db`).
 - **Run QA:** Select an OMOP table and run data profiling (QA) with ydata-profiling. Now uses the MCP orchestrator for all QA logic.
 - **Run Full MCP Pipeline:** Click the "Run Full MCP Pipeline" button to execute ETL, LLM mapping, QA, and analytics in sequence, with results shown in the UI.
+ - **Cohort Selection & Filtering:** At the bottom of the app, select an OMOP table, apply filters to columns (e.g., date ranges, concept IDs, numeric ranges), and view the filtered results in real time. This helps with cohort discovery and data exploration.
 
 ## Notes
 
