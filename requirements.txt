@@ -1,0 +1,6 @@
+streamlit
+pandas
+openpyxl
+ydata-profiling
+ollama
+sqlalchemy

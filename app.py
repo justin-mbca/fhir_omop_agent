@@ -16,6 +16,69 @@ from core.orchestration.mcp_orchestrator import MCPOrchestrator
 # Initialize SQLAlchemy engine for database access
 engine = get_db_engine()
 
+# --- General Data Upload (CSV, Excel, JSON) ---
+st.title("Healthcare Data Interoperability Toolkit")
+st.header("Upload Healthcare Data (CSV, Excel, JSON)")
+uploaded_data = st.file_uploader(
+    "Upload your healthcare data file",
+    type=["csv", "xlsx", "json"],
+    help="Supported formats: CSV, Excel (.xlsx), JSON"
+)
+
+if uploaded_data is not None:
+    filetype = uploaded_data.name.split('.')[-1].lower()
+    try:
+        if filetype == "csv":
+            df = pd.read_csv(uploaded_data)
+        elif filetype == "xlsx":
+            df = pd.read_excel(uploaded_data)
+        elif filetype == "json":
+            # Try to load as JSON array or object
+            data = json.load(uploaded_data)
+            if isinstance(data, list):
+                df = pd.DataFrame(data)
+            elif isinstance(data, dict):
+                # If dict, try to find a list value
+                for v in data.values():
+                    if isinstance(v, list):
+                        df = pd.DataFrame(v)
+                        break
+                else:
+                    df = pd.DataFrame([data])
+            else:
+                st.error("Unsupported JSON structure.")
+                df = None
+        else:
+            st.error("Unsupported file type.")
+            df = None
+        if df is not None:
+            st.success(f"Loaded {len(df)} rows, {len(df.columns)} columns.")
+            st.dataframe(df.head(20))
+            st.markdown("---")
+            st.header("Map Columns to FHIR Resources/Fields")
+            # Example FHIR resources and fields (expand as needed)
+            fhir_resources = {
+                "Patient": ["id", "name", "gender", "birthDate"],
+                "Observation": ["id", "code", "value", "effectiveDateTime"],
+                "Condition": ["id", "code", "onsetDateTime", "subject"],
+                "Procedure": ["id", "code", "performedDateTime", "subject"]
+            }
+            mapping = {}
+            for col in df.columns:
+                st.subheader(f"Column: `{col}`")
+                resource = st.selectbox(f"Select FHIR resource for `{col}`", list(fhir_resources.keys()), key=f"resource_{col}")
+                field = st.selectbox(f"Select FHIR field for `{col}`", fhir_resources[resource], key=f"field_{col}")
+                ai_suggest = st.button(f"AI Suggest for `{col}`", key=f"ai_{col}")
+                if ai_suggest:
+                    # Placeholder for AI suggestion logic
+                    st.info(f"[AI] Suggestion: Map `{col}` to {resource}.{field}")
+                mapping[col] = {"resource": resource, "field": field}
+            st.markdown("---")
+            st.write("### Current Mapping")
+            st.json(mapping)
+    except Exception as e:
+        st.error(f"Failed to load file: {e}")
+
 # --- Cohort Selection & Filtering ---
 st.markdown("---")
 st.header("Cohort Selection & Filtering")
