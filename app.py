@@ -102,26 +102,44 @@ if df is not None:
         if "date" in col:
             min_date = pd.to_datetime(df[col], errors="coerce").min()
             max_date = pd.to_datetime(df[col], errors="coerce").max()
-            val = st.date_input(f"Filter {col}", value=(min_date, max_date))
+            # Default to full range if possible
+            if pd.isnull(min_date) or pd.isnull(max_date):
+                val = (None, None)
+            else:
+                val = st.date_input(f"Filter {col}", value=(min_date, max_date), min_value=min_date, max_value=max_date)
             filters[col] = val
         elif "concept_id" in col:
             unique_vals = sorted(df[col].dropna().unique())
-            val = st.multiselect(f"Filter {col}", unique_vals, default=unique_vals)
-            filters[col] = val
+            if unique_vals:
+                val = st.multiselect(f"Filter {col}", unique_vals, default=unique_vals)
+                filters[col] = val
+            else:
+                st.info(f"Column {col} has no options to select.")
+                filters[col] = None
         else:
             min_val = int(df[col].min()) if not pd.isnull(df[col].min()) else 0
             max_val = int(df[col].max()) if not pd.isnull(df[col].max()) else 0
-            val = st.slider(f"Filter {col}", min_val, max_val, (min_val, max_val))
-            filters[col] = val
+            if min_val < max_val:
+                val = st.slider(f"Filter {col}", min_val, max_val, (min_val, max_val))
+                filters[col] = val
+            else:
+                st.info(f"Column {col} has a single value: {min_val}")
+                filters[col] = (min_val, max_val)
     # Apply filters
     df_filtered = df.copy()
     for col, val in filters.items():
         if "date" in col:
-            df_filtered = df_filtered[(pd.to_datetime(df_filtered[col], errors="coerce") >= pd.to_datetime(val[0])) & (pd.to_datetime(df_filtered[col], errors="coerce") <= pd.to_datetime(val[1]))]
+            if isinstance(val, tuple) and len(val) == 2:
+                df_filtered = df_filtered[(pd.to_datetime(df_filtered[col], errors="coerce") >= pd.to_datetime(val[0])) & (pd.to_datetime(df_filtered[col], errors="coerce") <= pd.to_datetime(val[1]))]
+            # else: skip filtering for this column
         elif "concept_id" in col:
-            df_filtered = df_filtered[df_filtered[col].isin(val)]
+            if val is not None:
+                df_filtered = df_filtered[df_filtered[col].isin(val)]
+            # else: skip filtering for this column
         else:
-            df_filtered = df_filtered[(df_filtered[col] >= val[0]) & (df_filtered[col] <= val[1])]
+            if isinstance(val, tuple) and len(val) == 2:
+                df_filtered = df_filtered[(df_filtered[col] >= val[0]) & (df_filtered[col] <= val[1])]
+            # else: skip filtering for this column
     st.dataframe(df_filtered)
     st.write(f"Filtered rows: {len(df_filtered)}")
 
@@ -609,16 +627,109 @@ if resources and last_resource_type in ["Patient", "Condition", "Encounter"]:
 
 st.markdown("---")
 
+
 uploaded_file = st.file_uploader("Upload FHIR JSON", type="json")
 
 if uploaded_file:
     fhir_data = json.load(uploaded_file)
-    st.subheader("Generated OMOP SQL")
-    sql_output = fhir_to_omop_sql(fhir_data, table="condition_occurrence")
+    from utils.fhir_utils import validate_fhir_resource, fhir_condition_to_omop_row, fhir_patient_to_omop_row, fhir_observation_to_omop_row
+    is_valid, errors = validate_fhir_resource(fhir_data)
+    st.subheader("FHIR Schema Validation Result")
+    if is_valid:
+        st.success("FHIR resource is valid!")
+    else:
+        st.error("FHIR resource is INVALID.")
+        st.write(errors)
+
+    resource_type = fhir_data.get("resourceType")
+    omop_row = None
+    table_name = None
+    create_sql = None
+    insert_sql = None
+    if resource_type == "Condition":
+        omop_row = fhir_condition_to_omop_row(fhir_data)
+        table_name = "condition_occurrence"
+        create_sql = """
+            CREATE TABLE IF NOT EXISTS condition_occurrence (
+                condition_occurrence_id TEXT PRIMARY KEY,
+                person_id TEXT,
+                condition_concept_id TEXT,
+                condition_start_date TEXT,
+                condition_type_concept_id INTEGER,
+                condition_source_value TEXT
+            )
+        """
+        insert_sql = """
+            INSERT OR REPLACE INTO condition_occurrence (
+                condition_occurrence_id, person_id, condition_concept_id, condition_start_date, condition_type_concept_id, condition_source_value
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """
+    elif resource_type == "Patient":
+        omop_row = fhir_patient_to_omop_row(fhir_data)
+        table_name = "person"
+        create_sql = """
+            CREATE TABLE IF NOT EXISTS person (
+                person_id TEXT PRIMARY KEY,
+                gender_concept_id INTEGER,
+                year_of_birth INTEGER,
+                month_of_birth INTEGER,
+                day_of_birth INTEGER,
+                race_concept_id INTEGER,
+                ethnicity_concept_id INTEGER
+            )
+        """
+        insert_sql = """
+            INSERT OR REPLACE INTO person (
+                person_id, gender_concept_id, year_of_birth, month_of_birth, day_of_birth, race_concept_id, ethnicity_concept_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+    elif resource_type == "Observation":
+        omop_row = fhir_observation_to_omop_row(fhir_data)
+        table_name = "observation"
+        create_sql = """
+            CREATE TABLE IF NOT EXISTS observation (
+                observation_id TEXT PRIMARY KEY,
+                person_id TEXT,
+                observation_concept_id TEXT,
+                observation_date TEXT,
+                observation_type_concept_id INTEGER,
+                value_as_number REAL,
+                value_as_string TEXT,
+                value_as_concept_id TEXT,
+                observation_source_value TEXT
+            )
+        """
+        insert_sql = """
+            INSERT OR REPLACE INTO observation (
+                observation_id, person_id, observation_concept_id, observation_date, observation_type_concept_id, value_as_number, value_as_string, value_as_concept_id, observation_source_value
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+    if omop_row:
+        st.subheader(f"OMOP Row (Deterministic Mapping for {resource_type})")
+        st.write(omop_row)
+        st.subheader(f"Insert OMOP Row into SQLite DB (Deterministic Mapping for {resource_type})")
+        if st.button(f"Insert OMOP {resource_type} Row"):
+            try:
+                conn = sqlite3.connect("omop_demo.db")
+                cur = conn.cursor()
+                # Always drop and recreate the table to ensure correct schema
+                cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+                cur.execute(create_sql)
+                cur.execute(insert_sql, omop_row)
+                conn.commit()
+                st.success(f"OMOP {resource_type} row inserted into omop_demo.db! (Table recreated)")
+            except Exception as e:
+                st.error(f"OMOP {resource_type} row insert failed: {e}")
+            finally:
+                conn.close()
+
+    st.subheader("Generated OMOP SQL (LLM)")
+    sql_output = fhir_to_omop_sql(fhir_data, table=table_name or "condition_occurrence")
     st.code(sql_output, language="sql")
 
-    # Option to run SQL directly
-    st.subheader("Run SQL Insert into OMOP SQLite DB")
+    # Option to run SQL directly (LLM SQL)
+    st.subheader("Run SQL Insert into OMOP SQLite DB (LLM SQL)")
     if st.button("Run SQL Insert"):
         try:
             conn = sqlite3.connect("omop_demo.db")

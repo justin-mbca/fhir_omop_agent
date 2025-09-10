@@ -31,12 +31,66 @@ All values are cast to integers or set to `None` to match the OMOP schema and av
 All file paths, database settings, and output directories are managed in `config.yaml`. The orchestrator and all modules use this config for robust, portable execution.
 
 ---
+
 # FHIR → OMOP Agent + QA Copilot
 
+This project is an open-source toolkit for healthcare data interoperability, focused on mapping FHIR resources to OMOP CDM tables, validating data, and enabling analytics—all from an interactive Streamlit GUI. It is designed for extensibility and collaboration, making it ideal for developers, data engineers, and clinical informatics teams.
 
+## Key Features
 
+- **Upload Healthcare Data:** Supports CSV, Excel, and FHIR JSON uploads.
+- **Deterministic FHIR-to-OMOP Mapping:** Robust, reproducible mapping functions for Patient, Condition, and Observation resources to OMOP tables.
+- **FHIR Schema Validation:** Validates FHIR resources using official schemas before mapping or export.
+- **Interactive Filtering & Cohort Selection:** Explore OMOP tables with dynamic filters and cohort discovery tools.
+- **LLM-Powered Mapping (Optional):** Experiment with LLM-generated SQL for rapid prototyping and mapping suggestions.
+- **Analytics & QA:** Run data profiling and generate QA reports on OMOP tables.
+- **Extensible Architecture:** Modular codebase for adding new resource types, data sources, or analytics.
 
-This app demonstrates a local, LLM-powered pipeline for mapping FHIR resources to OMOP tables, running data quality checks, and experimenting with LLM prompts—all from a Streamlit GUI. The project is organized for extensibility, with a modular folder structure for future integrations (e.g., oncology DB, on-premise DB).
+## Collaboration & Contribution
+
+This repository is open for collaboration! If you are a developer, data scientist, or healthcare professional interested in FHIR, OMOP, or clinical data engineering, you are welcome to:
+
+- Fork the repo and submit pull requests for new features or bug fixes
+- Open issues for feature requests, questions, or feedback
+- Join as a contributor to help expand deterministic mapping, validation, or analytics
+- Use the toolkit for your own research, integration, or demo projects
+
+**Share this GitHub repo with potential collaborators and users to showcase your hands-on FHIR/OMOP skills and invite contributions.**
+
+## Quick Start
+
+1. Clone the repo:
+   ```bash
+   git clone https://github.com/justin-mbca/fhir_omop_agent.git
+   cd fhir_omop_agent
+   ```
+2. Set up the Python environment and install requirements:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+3. Run the Streamlit app:
+   ```bash
+   streamlit run app.py
+   ```
+4. Upload sample FHIR JSON files from the `data/` directory to test deterministic mapping and validation.
+
+## Demo Data
+
+Sample FHIR JSON files for Patient, Condition, and Observation are provided in the `data/` directory for quick testing and demonstration.
+
+## Roadmap & Opportunities
+
+- Add user authentication and multi-user support
+- Build out FastAPI backend for RESTful API access
+- Integrate more FHIR resource types and OMOP tables
+- Enhance AI/LLM mapping suggestions and documentation
+- Support for deployment (AWS, Render, etc.) and SaaS features
+
+## License
+
+MIT License. See LICENSE file for details.
 
 ---
 
